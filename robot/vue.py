@@ -63,6 +63,16 @@ class VuePygame:
         x2 = px + int(1.5 * r * math.cos(robot.orientation))
         y2 = py - int(1.5 * r * math.sin(robot.orientation))
         pygame.draw.line(self.screen, (255, 255, 255), (px, py), (x2, y2), 2)
+        
+    def dessiner_lidar(self, robot: RobotMobile) -> None:
+        for capteur in getattr(robot, "capteurs", []):
+            if capteur.__class__.__name__ == "Lidar":
+                x0, y0 = self.convertir_coordonnees(robot.x, robot.y)
+
+                for (hx, hy) in capteur.hit_points:
+                    x1, y1 = self.convertir_coordonnees(hx, hy)
+                    pygame.draw.line(self.screen, (0, 255, 0), (x0, y0), (x1, y1), 1)
+                    pygame.draw.circle(self.screen, (0, 255, 0), (x1, y1), 2)
 
     def dessiner_treasures(self, env: Environnement) -> None:
         for treasure in env.treasures:
@@ -106,6 +116,7 @@ class VuePygame:
 
         # Robot
         if env.robot is not None:
+            self.dessiner_lidar(env.robot)
             self.dessiner_robot(env.robot)
 
         # HUD

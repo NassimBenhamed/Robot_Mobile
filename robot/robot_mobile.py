@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Any, Dict
+from typing import Optional, Any, List
 from robot.moteur import Moteur
 
 
@@ -18,6 +18,7 @@ class RobotMobile:
         self.__y = float(y)
         self.__orientation = float(orientation) % (2 * math.pi)
         self.rayon = float(rayon)
+        self.capteurs: List[Any] = []
 
         if moteur is not None and not RobotMobile.moteur_valide(moteur):
             raise TypeError("Le moteur fourni n'est pas valide")
@@ -92,3 +93,16 @@ class RobotMobile:
     @staticmethod
     def moteur_valide(moteur: Any) -> bool:
         return isinstance(moteur, Moteur)
+    
+    # =========================
+    # Capteurs
+    # =========================
+    def add_capteur(self, capteur: Any) -> None:
+        self.capteurs.append(capteur)
+
+    def read_sensors(self, env) -> dict:
+        mesures = {}
+        for capteur in self.capteurs:
+            nom = capteur.__class__.__name__
+            mesures[nom] = capteur.read(self, env)
+        return mesures

@@ -6,6 +6,7 @@ from robot.vue import VuePygame
 from robot.environnement import Environnement
 from robot.obstacles import ObstacleCirculaire
 from robot.game import Treasure, GameState
+from robot.sensors import Lidar
 
 def main():
     # Monde : 10 x 7 (unités)
@@ -15,6 +16,8 @@ def main():
     env.set_game(game)
 
     robot = RobotMobile(x=2.0, y=2.0, moteur=MoteurDifferentiel(), rayon=0.2)
+    lidar = Lidar(n_rays=36, max_range=3.0)
+    robot.add_capteur(lidar)
     env.ajouter_robot(robot)
 
     # Obstacles
@@ -43,6 +46,7 @@ def main():
 
         robot.commander(**cmd)
         env.mettre_a_jour(dt)
+        robot.read_sensors(env)
         vue.dessiner_environnement(env)
 
     print(f"Fin du programme pygame. Score final = {game.score} | Trésors = {game.treasures_collected}/{len(env.treasures)}")
