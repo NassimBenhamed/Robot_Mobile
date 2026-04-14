@@ -1,74 +1,181 @@
-from robot.navigation.selector import select_nearest_treasure
-from robot.navigation.go_to_goal import compute_go_to_goal_command
-from robot.navigation.reactive import (
-    compute_free_space_command,
-    get_lidar,
-    build_ray_angles,
-    normalize_angle,
+from dataclasses import dataclass
+
+from robot.navigation.selector import (
+    select_feasible_treasure,
+    select_best_open_treasure,
+    corridor_clearance_to_point,
 )
+from robot.navigation.reactive import analyze_sectors, go_toward
+
+
+@dataclass
+class TargetPoint:
+    x: float
+    y: float
 
 
 class AutoPilot:
-    """
-    Pilote autonome :
-    - choisit le trésor le plus proche
-    - utilise le Lidar pour trouver un groupe de directions libres
-    - garde temporairement le même couloir pour éviter les hésitations
-    """
     def __init__(self):
-        self.locked_ray_index = None
-        self.lock_time_left = 0.0
+        self.current_mode = "treasure"   # "treasure", "home", "escape"
+        self.escape_side = "left"
+        self.escape_time = 0.0
 
-    def _update_lock_timer(self, dt: float):
-        if self.lock_time_left > 0.0:
-            self.lock_time_left = max(0.0, self.lock_time_left - float(dt))
-            if self.lock_time_left == 0.0:
-                self.locked_ray_index = None
+    def _update_timer(self, dt: float):
+        if self.escape_time > 0.0:
+            self.escape_time = max(0.0, self.escape_time - float(dt))
+
+    def _home_target(self, game):
+        return TargetPoint(game.house.x, game.house.y)
+
+    def _near_border(self, robot, env, margin: float = 0.45) -> bool:
+        return (
+            robot.x <= margin or
+            robot.x >= env.largeur - margin or
+            robot.y <= margin or
+            robot.y >= env.hauteur - margin
+        )
+
+    def _border_escape_target(self, env):
+        return TargetPoint(env.largeur / 2.0, env.hauteur / 2.0)
+
+    def _choose_escape_side(self, info):
+        return "left" if info["left_mean"] >= info["right_mean"] else "right"
+
+    def _choose_target(self, robot, env):
+        game = env.game
+
+        if game is None or game.house is None:
+            return None, "idle"
+
+        if self._near_border(robot, env, margin=0.45):
+            return self._border_escape_target(env), "escape"
+
+        if game.should_return_home(robot, safety_margin=4.0, speed_estimate=0.75):
+            return self._home_target(game), "home"
+
+        # priorité à un trésor faisable ET avec un couloir ouvert
+        open_target = select_best_open_treasure(
+            robot,
+            env.treasures,
+            game,
+            k_angle=0.7,
+            safety_margin=4.0,
+            min_clearance=0.95,
+        )
+        if open_target is not None:
+            return open_target, "treasure"
+
+        # fallback : trésor faisable même si le couloir est moins bon
+        fallback = select_feasible_treasure(
+            robot,
+            env.treasures,
+            game,
+            k_angle=0.7,
+            safety_margin=4.0,
+        )
+        if fallback is not None:
+            return fallback, "treasure"
+
+        return self._home_target(game), "home"
 
     def compute_command(self, robot, env, dt: float):
-        self._update_lock_timer(dt)
+        self._update_timer(dt)
 
-        target = select_nearest_treasure(robot, env.treasures)
+        game = env.game
+        if game is None:
+            return {"v": 0.0, "omega": 0.0}
+
+        target, desired_mode = self._choose_target(robot, env)
         if target is None:
             return {"v": 0.0, "omega": 0.0}
 
-        lidar = get_lidar(robot)
+        info = analyze_sectors(robot, target)
+        if info is None:
+            return {"v": 0.0, "omega": 0.0}
 
-        # Si on a déjà un couloir verrouillé et que le Lidar existe encore,
-        # on continue dessus un court instant
-        if (
-            self.locked_ray_index is not None
-            and self.lock_time_left > 0.0
-            and lidar is not None
-            and getattr(lidar, "distances", None)
-        ):
-            distances = lidar.distances
-            n = len(distances)
+        target_angle = info["target_angle"]
+        front_mean = info["front_mean"]
+        left_mean = info["left_mean"]
+        right_mean = info["right_mean"]
 
-            if 0 <= self.locked_ray_index < n:
-                ray_angles = build_ray_angles(robot, lidar, n)
-                chosen_angle = ray_angles[self.locked_ray_index]
-                angle_error = normalize_angle(chosen_angle - robot.orientation)
+        # qualité réelle du couloir vers la cible choisie
+        target_clearance = corridor_clearance_to_point(robot, target.x, target.y, neighbor_span=1)
 
-                if abs(angle_error) > 0.30:
-                    return {
-                        "v": 0.14,
-                        "omega": 2.5 if angle_error > 0 else -2.5
-                    }
+        # collision au tick précédent -> petit escape
+        if getattr(env, "just_collided", False):
+            self.current_mode = "escape"
+            self.escape_side = self._choose_escape_side(info)
+            self.escape_time = 0.40
+            env.just_collided = False
 
-        cmd, chosen_center_i = compute_free_space_command(
-            robot,
-            target,
-            safe_threshold=1.15,
-            blocked_threshold=0.90,
-            v_max=0.95,
-            omega_max=2.5
-        )
+        # proche du bord -> on recentre
+        if desired_mode == "escape":
+            self.current_mode = "escape"
 
-        if cmd is not None:
-            if chosen_center_i is not None:
-                self.locked_ray_index = chosen_center_i
-                self.lock_time_left = 0.35
-            return cmd
+        # mode escape : rotation seulement
+        if self.current_mode == "escape":
+            if self.escape_time > 0.0:
+                return {
+                    "v": 0.0,
+                    "omega": 2.6 if self.escape_side == "left" else -2.6
+                }
 
-        return compute_go_to_goal_command(robot, target)
+            # si on s'est dégagé, on revient à la logique normale au tick suivant
+            self.current_mode = "home" if desired_mode == "escape" else desired_mode
+
+            side = "left" if left_mean >= right_mean else "right"
+            return {
+                "v": 0.0,
+                "omega": 2.4 if side == "left" else -2.4
+            }
+
+        # --- Comportement normal ---
+
+        # Si la cible actuelle est un trésor mais que le couloir est nul,
+        # on refuse de s'acharner dessus.
+        if desired_mode == "treasure" and target_clearance < 0.80:
+            alt_target = select_best_open_treasure(
+                robot,
+                env.treasures,
+                game,
+                k_angle=0.7,
+                safety_margin=4.0,
+                min_clearance=0.95,
+            )
+
+            if alt_target is not None and (alt_target.x != target.x or alt_target.y != target.y):
+                target = alt_target
+                info = analyze_sectors(robot, target)
+                if info is not None:
+                    target_angle = info["target_angle"]
+                    front_mean = info["front_mean"]
+                    left_mean = info["left_mean"]
+                    right_mean = info["right_mean"]
+                    target_clearance = corridor_clearance_to_point(robot, target.x, target.y, neighbor_span=1)
+            else:
+                # S'il n'y a pas de bon trésor ouvert, on tourne et on scanne,
+                # au lieu de rester obsédé par cette cible.
+                side = "left" if left_mean >= right_mean else "right"
+                return {
+                    "v": 0.0,
+                    "omega": 2.5 if side == "left" else -2.5
+                }
+
+        # Si le chemin est vraiment bon, on avance
+        if front_mean > 0.95 and target_clearance > 0.90:
+            if desired_mode == "home":
+                return go_toward(robot, target_angle, v_max=0.82, omega_max=2.0)
+            return go_toward(robot, target_angle, v_max=0.92, omega_max=2.2)
+
+        # Si le chemin est moyen, on avance lentement
+        if front_mean > 0.75 and target_clearance > 0.75:
+            if desired_mode == "home":
+                return go_toward(robot, target_angle, v_max=0.55, omega_max=1.9)
+            return go_toward(robot, target_angle, v_max=0.60, omega_max=2.0)
+
+        # Sinon : on arrête d'avancer et on tourne vers le côté le plus libre
+        side = "left" if left_mean >= right_mean else "right"
+        return {
+            "v": 0.0,
+            "omega": 2.4 if side == "left" else -2.4
+        }
