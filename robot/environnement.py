@@ -18,6 +18,11 @@ class Environnement:
 
         self.just_collided = False
 
+        # Debug / affichage du chemin
+        self.debug_target = None
+        self.debug_path = []
+        self.debug_direct_line = None
+
     def ajouter_robot(self, robot: RobotMobile) -> None:
         self.robot = robot
 

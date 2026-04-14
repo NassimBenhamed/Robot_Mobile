@@ -47,6 +47,8 @@ class VuePygame:
         pygame.display.set_caption("Robot MVC")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("Arial", 20)
+        self.button_font = pygame.font.SysFont("Arial", 18, bold=True)
+        self.quit_button_rect = pygame.Rect(self.largeur_px - 170, 12, 150, 38)
 
     def convertir_coordonnees(self, x: float, y: float) -> Tuple[int, int]:
         # (0,0) monde en bas-gauche -> pygame en haut-gauche
@@ -84,6 +86,31 @@ class VuePygame:
 
             pygame.draw.circle(self.screen, (255, 215, 0), (px, py), r)
             pygame.draw.circle(self.screen, (0, 0, 0), (px, py), r, 2)
+            
+    def dessiner_debug_path(self, env: Environnement) -> None:
+        # Ligne directe robot -> cible
+        if env.debug_direct_line is not None:
+            x1, y1, x2, y2, is_clear = env.debug_direct_line
+            p1 = self.convertir_coordonnees(x1, y1)
+            p2 = self.convertir_coordonnees(x2, y2)
+
+            color = (0, 200, 0) if is_clear else (220, 60, 60)
+            pygame.draw.line(self.screen, color, p1, p2, 2)
+
+        # Chemin détaillé
+        if env.debug_path and len(env.debug_path) >= 2:
+            converted = [self.convertir_coordonnees(x, y) for (x, y) in env.debug_path]
+
+            for i in range(len(converted) - 1):
+                pygame.draw.line(self.screen, (80, 170, 255), converted[i], converted[i + 1], 3)
+
+            for p in converted[1:-1]:
+                pygame.draw.circle(self.screen, (255, 140, 0), p, 6)
+
+        # Point cible principal
+        if env.debug_target is not None:
+            px, py = self.convertir_coordonnees(env.debug_target.x, env.debug_target.y)
+            pygame.draw.circle(self.screen, (255, 255, 255), (px, py), 7, 2)
 
     def dessiner_hud(self, env: Environnement) -> None:
         if env.game is None:
@@ -114,6 +141,9 @@ class VuePygame:
         # Trésors
         self.dessiner_treasures(env)
 
+        # Debug chemin / cible
+        self.dessiner_debug_path(env)
+
         # Robot
         if env.robot is not None:
             self.dessiner_lidar(env.robot)
@@ -121,9 +151,32 @@ class VuePygame:
 
         # HUD
         self.dessiner_hud(env)
+        self.dessiner_bouton_fin()
 
         pygame.display.flip()
 
     def tick(self, fps: int = 60) -> float:
         ms = self.clock.tick(int(fps))
         return ms / 1000.0
+
+    def dessiner_bouton_fin(self) -> None:
+        pygame.draw.rect(self.screen, (180, 40, 40), self.quit_button_rect, border_radius=8)
+        pygame.draw.rect(self.screen, (255, 255, 255), self.quit_button_rect, 2, border_radius=8)
+
+        texte = self.button_font.render("Fin de partie", True, (255, 255, 255))
+        texte_rect = texte.get_rect(center=self.quit_button_rect.center)
+        self.screen.blit(texte, texte_rect)
+        
+    def gerer_evenements(self) -> bool:
+        """
+        Retourne False si on veut fermer la partie.
+        """
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.quit_button_rect.collidepoint(event.pos):
+                    return False
+
+        return True

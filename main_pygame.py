@@ -61,17 +61,21 @@ def clear_wave_objects(env):
     env.treasures = []
 
 
-def generate_wave_obstacles(env, house, wave_index, n_obstacles=5):
+def generate_wave_obstacles(env, house, wave_index, n_obstacles=None):
     """
-    5 obstacles par vague.
-    Difficulté croissante : taille moyenne légèrement plus grande.
+    Difficulté croissante :
+    - le nombre d'obstacles augmente avec la vague
+    - leur taille moyenne augmente légèrement
     """
+    if n_obstacles is None:
+        n_obstacles = min(5 + (wave_index - 1), 10)
+
     for _ in range(n_obstacles):
         placed = False
 
         for _attempt in range(300):
-            r_min = min(0.22 + 0.01 * (wave_index - 1), 0.30)
-            r_max = min(0.38 + 0.015 * (wave_index - 1), 0.52)
+            r_min = min(0.24 + 0.015 * (wave_index - 1), 0.34)
+            r_max = min(0.42 + 0.020 * (wave_index - 1), 0.62)
 
             rayon = random.uniform(r_min, r_max)
             x = random.uniform(rayon + 0.3, env.largeur - rayon - 0.3)
@@ -91,12 +95,12 @@ def generate_wave_obstacles(env, house, wave_index, n_obstacles=5):
 
 def generate_wave_treasures(env, robot, house, wave_index, n_treasures=10):
     """
-    10 trésors par vague.
-    Difficulté croissante : on force les trésors à être plus loin de la maison.
+    Difficulté croissante :
+    - les trésors sont de plus en plus loin de la maison
     """
     possible_values = [5, 10, 15, 20]
 
-    min_dist_from_house = min(1.2 + 0.18 * (wave_index - 1), 2.4)
+    min_dist_from_house = min(1.5 + 0.28 * (wave_index - 1), 3.2)
 
     for _ in range(n_treasures):
         placed = False
@@ -129,7 +133,7 @@ def setup_wave(env, robot, game, wave_index):
 
     game.prepare_wave(wave_index)
 
-    generate_wave_obstacles(env, game.house, wave_index, n_obstacles=5)
+    generate_wave_obstacles(env, game.house, wave_index)
     generate_wave_treasures(env, robot, game.house, wave_index, n_treasures=10)
 
 
@@ -158,6 +162,11 @@ def main():
 
     running = True
     while running:
+        if not vue.gerer_evenements():
+            game.game_over = True
+            running = False
+            continue
+
         dt = vue.tick(fps=60)
         game.step(dt)
 

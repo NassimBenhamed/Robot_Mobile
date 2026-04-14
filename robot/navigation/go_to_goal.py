@@ -2,9 +2,6 @@ import math
 
 
 def normalize_angle(angle: float) -> float:
-    """
-    Ramène un angle dans [-pi, pi].
-    """
     while angle > math.pi:
         angle -= 2 * math.pi
     while angle < -math.pi:
@@ -12,28 +9,41 @@ def normalize_angle(angle: float) -> float:
     return angle
 
 
-def compute_go_to_goal_command(robot, target, v_max: float = 1.5, omega_max: float = 2.0):
+def compute_go_to_goal_command(robot, target, v_max: float = 1.25, omega_max: float = 2.6):
     """
-    Retourne une commande différentielle simple pour aller vers la cible.
+    Contrôleur simple :
+    - tourne vers la cible
+    - avance quand l'angle est correct
+    - ralentit à l'approche
     """
     dx = target.x - robot.x
     dy = target.y - robot.y
 
+    dist = math.hypot(dx, dy)
     target_angle = math.atan2(dy, dx)
     angle_error = normalize_angle(target_angle - robot.orientation)
 
-    # Si l'erreur angulaire est forte, on tourne presque sur place
-    if abs(angle_error) > 0.3:
+    # cible atteinte
+    if dist < 0.18:
+        return {"v": 0.0, "omega": 0.0}
+
+    # forte erreur d'angle : tourner presque sur place
+    if abs(angle_error) > 0.45:
         v = 0.0
         omega = omega_max if angle_error > 0 else -omega_max
-    else:
-        v = v_max
-        omega = 1.5 * angle_error
+        return {"v": v, "omega": omega}
 
-        # saturation
-        if omega > omega_max:
-            omega = omega_max
-        elif omega < -omega_max:
-            omega = -omega_max
+    # vitesse proportionnelle à la distance, bornée
+    v = min(v_max, max(0.22, 1.05 * dist))
+    omega = 2.0 * angle_error
+
+    if omega > omega_max:
+        omega = omega_max
+    elif omega < -omega_max:
+        omega = -omega_max
+
+    # si l'angle n'est pas encore parfait, on avance plus doucement
+    if abs(angle_error) > 0.20:
+        v *= 0.55
 
     return {"v": v, "omega": omega}
