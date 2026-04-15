@@ -10,7 +10,6 @@ except ImportError:  # pragma: no cover
 class Controleur(ABC):
     @abstractmethod
     def lire_commande(self) -> Optional[Dict[str, Any]]:
-        """Retourne une commande (dict) pour le robot, ou None pour quitter."""
         pass
 
 
@@ -40,32 +39,17 @@ class ControleurTerminal(Controleur):
 class ControleurClavierPygame(Controleur):
     """
     Contrôle simple en différentiel avec clavier :
-      - flèche haut/bas : v +/- 
-      - flèche gauche/droite : omega +/-
-      - espace : stop
-      - echap / fermeture fenêtre : quitter
-
-    vitesses paramétrables avec v_max et omega_max
+    - flèche haut/bas : v +/-
+    - flèche gauche/droite : omega +/-
+    - espace : stop
     """
     def __init__(self, v_max: float = 2.0, omega_max: float = 2.0):
         if pygame is None:
             raise RuntimeError("pygame n'est pas installé. Installe-le avec: pip install pygame")
         self.v_max = float(v_max)
         self.omega_max = float(omega_max)
-        self._quit = False
-
-    def gerer_evenements(self) -> bool:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self._quit = True
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self._quit = True
-        return not self._quit
 
     def lire_commande(self) -> Optional[Dict[str, Any]]:
-        if not self.gerer_evenements():
-            return None
-
         keys = pygame.key.get_pressed()
 
         v = 0.0

@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
-from robot.navigation.selector import select_feasible_treasure
+from robot.navigation.selector import (
+    select_feasible_treasure,
+    select_first_mandatory_treasure,
+)
 from robot.navigation.go_to_goal import compute_go_to_goal_command
 from robot.navigation.path_utils import (
     Point2D,
@@ -31,7 +34,14 @@ class AutoPilot:
         if game is None or game.house is None:
             return None, "idle"
 
-        # Priorité retour maison si nécessaire
+        # Tant qu'aucun trésor n'a encore été ramassé dans la vague,
+        # on force au moins une tentative de collecte.
+        if game.treasures_collected_wave == 0:
+            first_target = select_first_mandatory_treasure(robot, env.treasures)
+            if first_target is not None:
+                return first_target, "treasure"
+
+        # Ensuite seulement, on applique la logique normale de retour
         if game.should_return_home(robot, safety_margin=4.0, speed_estimate=0.90):
             return self._home_target(game), "home"
 

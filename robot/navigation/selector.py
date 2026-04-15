@@ -165,3 +165,18 @@ def select_nearest_treasure(robot, treasures):
         available,
         key=lambda t: math.hypot(t.x - robot.x, t.y - robot.y)
     )
+    
+def select_first_mandatory_treasure(robot, treasures):
+    """
+    Choisit un premier trésor sans contrainte de temps.
+    Objectif : forcer au moins une tentative pendant la vague.
+    On prend le plus proche en coût géométrique.
+    """
+    available = [t for t in treasures if not t.collected]
+    if not available:
+        return None
+
+    return min(
+        available,
+        key=lambda t: compute_treasure_cost(robot, t, k_angle=0.5)
+    )
