@@ -279,7 +279,7 @@ def main():
     game = GameState()
     game.house = house
     game.base_time_limit = float(initial_time)
-    game.min_time_limit = 15.0
+    game.min_time_limit = 10.0
     env.set_game(game)
 
     robot = RobotMobile(

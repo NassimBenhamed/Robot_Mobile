@@ -1,263 +1,368 @@
-#  Projet Robotique – Treasure Hunter avec Lidar
+# Projet Robotique – Treasure Hunter autonome avec LiDAR
 
-##  Objectif du projet
+## Objectif du projet
 
-Ce projet a pour objectif de simuler un robot mobile autonome dans un environnement 2D.
+Ce projet simule un robot mobile autonome dans un environnement 2D.
 
 Le robot doit :
 - se déplacer dans un environnement avec obstacles
-- percevoir son environnement via un capteur Lidar
-- collecter des trésors
-- optimiser son comportement de navigation
-
-Le projet met en œuvre des concepts de :
-- programmation orientée objet (POO)
-- robotique mobile
-- perception (capteurs)
-- navigation autonome
+- percevoir son environnement avec un capteur LiDAR
+- collecter des trésors de différentes valeurs
+- revenir dans une maison avant la fin du temps
+- survivre à des vagues de difficulté croissante
 
 ---
 
-##  Architecture du projet
+## Principe du jeu
 
-Le projet est organisé en plusieurs modules représentant les différentes briques d’un système robotique.
+Le projet fonctionne comme un **jeu par vagues** :
 
----
+- chaque vague génère :
+  - des obstacles
+  - des trésors
+- le robot démarre dans une maison
+- il doit sortir, collecter des trésors puis revenir
+- si le robot ne revient pas à temps → fin de partie
+- si le robot revient → vague suivante
 
-##  Structure des fichiers
-
-###  `robot/`
-
-Contient l’ensemble du code principal du robot et de la simulation.
-
----
-
-###  `robot_mobile.py`
-Classe principale représentant le robot.
-
-Fonctionnalités :
-- position (x, y)
-- orientation
-- rayon (collision)
-- gestion du moteur
-- gestion des capteurs
-
-Ajouts récents :
-- support des capteurs (`capteurs`)
-- méthode `read_sensors()`
+La difficulté augmente :
+- plus d’obstacles
+- placement plus complexe
+- trésors plus éloignés
+- temps réduit progressivement
 
 ---
 
-###  `moteur.py`
-Implémentation des moteurs du robot.
+## Structure du projet
 
-- `MoteurDifferentiel`
-- conversion des commandes (vitesse, rotation)
+```
 
----
+project/
+│
+├── main_pygame.py
+├── main_terminal.py
+├── wave_report.csv
+│
+└── robot/
+├── robot_mobile.py
+├── moteur.py
+├── controleur.py
+├── environnement.py
+├── obstacles.py
+├── game.py
+├── vue.py
+├── wave_csv.py
+│
+├── navigation/
+│   ├── autopilot.py
+│   ├── go_to_goal.py
+│   ├── path_utils.py
+│   ├── reactive.py
+│   └── selector.py
+│
+└── sensors/
+├── capteur.py
+└── lidar.py
 
-###  `controleur.py`
-Permet de contrôler le robot :
-
-- `ControleurTerminal` → commandes clavier en terminal
-- `ControleurClavierPygame` → commandes clavier avec Pygame
-
----
-
-###  `environnement.py`
-Modélise le monde 2D.
-
-Fonctionnalités :
-- gestion des dimensions
-- gestion du robot
-- gestion des obstacles
-- gestion des collisions
-- gestion des trésors (ajout récent)
-
-Ajouts récents :
-- `treasures`
-- `GameState`
-- détection de ramassage
-
----
-
-###  `obstacles.py`
-Définition des obstacles.
-
-- `ObstacleCirculaire`
-- détection de collision avec le robot
+````
 
 ---
 
-###  `game.py`
-Gestion de la logique du jeu.
+## Description des fichiers
+
+### Fichiers principaux
+
+#### `main_pygame.py`
+Point d’entrée principal.
+
+Gère :
+- le menu (mode IA / joueur)
+- le choix du temps
+- la création de l’environnement
+- la génération des vagues
+- la boucle du jeu
+- la fin de partie
+
+---
+
+#### `main_terminal.py`
+Version simple du projet en terminal.
+
+Permet :
+- de tester le robot sans interface graphique
+- de contrôler le robot via le clavier
+
+---
+
+## Dossier `robot/`
+
+#### `robot_mobile.py`
+Représente le robot.
 
 Contient :
-- `Treasure` → position, rayon, valeur
-- `GameState` → score, timer, statistiques
-- `check_treasure_pickup()` → ramassage des trésors
+- position (x, y)
+- orientation
+- rayon
+- moteur
+- capteurs
 
 ---
 
-###  `vue.py`
-Gestion de l’affichage.
+#### `moteur.py`
+Implémente les moteurs.
 
-#### Modes :
-- terminal
-- Pygame
-
-Fonctionnalités Pygame :
-- affichage du robot
-- affichage des obstacles
-- affichage des trésors
-- affichage du HUD (score, temps, progression)
-- affichage des rayons Lidar
+Contient :
+- moteur différentiel (principal)
+- mise à jour du mouvement
+- bruit moteur (réalisme)
 
 ---
 
-##  `robot/sensors/`
+#### `controleur.py`
+Gestion du contrôle du robot.
 
-Gestion des capteurs.
+- contrôle clavier
+- contrôle terminal
 
 ---
 
-###  `capteur.py`
+#### `environnement.py`
+Gère le monde.
+
+- obstacles
+- trésors
+- collisions
+- mise à jour globale
+
+---
+
+#### `obstacles.py`
+Définit les obstacles (principalement circulaires).
+
+---
+
+#### `game.py`
+Logique du jeu.
+
+Contient :
+- `Treasure`
+- `House`
+- `GameState`
+
+Gère :
+- score
+- vagues
+- timer
+- retour maison
+
+---
+
+#### `vue.py`
+Affichage Pygame.
+
+Affiche :
+- robot
+- obstacles
+- trésors (avec valeur)
+- maison
+- LiDAR
+- score
+- temps
+- vague
+- boutons (pause, fin)
+
+---
+
+#### `wave_csv.py`
+Génère le fichier CSV de suivi.
+
+Permet :
+- analyser les distances
+- suivre les vagues
+- comparer théorie vs réalité
+
+---
+
+## Navigation
+
+#### `autopilot.py`
+IA principale du robot.
+
+- choix de cible
+- décision (trésor ou maison)
+- stratégie globale
+
+---
+
+#### `go_to_goal.py`
+Déplacement vers une cible.
+
+- calcul angle
+- vitesse
+- orientation
+
+---
+
+#### `path_utils.py`
+Fonctions utilitaires :
+
+- test de ligne libre
+- calcul de points intermédiaires
+
+---
+
+#### `reactive.py`
+Ancienne navigation réactive.
+
+- basée uniquement sur le LiDAR
+- conservée pour comparaison
+
+---
+
+#### `selector.py`
+Choix du trésor cible.
+
+---
+
+## Capteurs
+
+#### `capteur.py`
 Classe abstraite de capteur.
 
 ---
 
-###  `lidar.py`
-Implémentation du capteur Lidar.
+#### `lidar.py`
+Capteur principal.
 
-Fonctionnalités :
-- lancer de rayons
-- détection des obstacles
-- calcul des distances
-- stockage des points d’impact
+- envoie des rayons
+- mesure distances
+- détecte obstacles
 
 ---
 
-##  `robot/navigation/`
+## Fichier CSV
 
-Gestion de la navigation autonome.
+### `wave_report.csv`
 
----
+Contient :
+- données sur les vagues
+- distances aux trésors
+- estimations de temps
+- données d’analyse
 
-###  `selector.py`
-Sélection de la cible.
-
-- sélection du trésor le plus proche
-
----
-
-###  `go_to_goal.py`
-Commande pour se diriger vers une cible.
-
-- calcul de l’angle
-- contrôle vitesse + rotation
-
----
-
-###  `reactive.py`
-Navigation basée sur le Lidar.
-
-- analyse des rayons
-- sélection des directions libres
-- évitement des obstacles
-
- version avancée :
-- choix de la direction la plus sûre
-- guidage vers le trésor via espace libre
-
----
-
-###  `autopilot.py`
-Pilote autonome du robot.
-
-Fonctionnalités :
-- sélection de la cible
-- navigation basée sur le Lidar
-- comportement autonome complet
-
----
-
-##  Fichiers principaux
-
----
-
-###  `main_terminal.py`
-Mode simple en terminal.
-
-- déplacement manuel
-- affichage texte
-
----
-
-###  `main_pygame.py`
-Mode principal du projet.
-
-Fonctionnalités :
-- simulation complète
-- affichage graphique
-- Lidar
-- navigation autonome
-- gestion du score et du temps
+Utile pour :
+- démonstration
+- analyse du comportement du robot
 
 ---
 
 ## Fonctionnement global
 
-1. Initialisation du monde (environnement, obstacles, trésors)
-2. Initialisation du robot et de ses capteurs
-3. Boucle de simulation :
-   - lecture des capteurs
-   - prise de décision (autopilot)
-   - mouvement du robot
-   - gestion des collisions
-   - collecte des trésors
-   - affichage
+1. Choix du mode (IA / joueur)
+2. Choix du temps
+3. Génération de la vague
+4. Le robot agit :
+   - IA → autonome
+   - joueur → clavier
+5. Collecte des trésors
+6. Retour à la maison
+7. Nouvelle vague ou fin de partie
 
 ---
 
-##  Intelligence du robot
+## Modes disponibles
 
-Le robot utilise une navigation en deux niveaux :
-
-### 1. Navigation globale
-- choix du trésor cible
-
-### 2. Navigation locale (Lidar)
-- analyse des directions libres
-- évitement des obstacles
-- suivi d’un chemin sûr
+### Mode IA
+- robot autonome
+- possibilité d’afficher :
+  - capteurs
+  - chemins
 
 ---
 
-## Fonctionnalités actuelles
+### Mode joueur
+Contrôle clavier :
 
- Déplacement du robot  
- Gestion des collisions  
- Trésors avec score  
- Timer de jeu  
- Affichage Pygame  
- Capteur Lidar  
- Visualisation des rayons  
- Navigation autonome  
- Évitement intelligent des obstacles  
+- ↑ avancer
+- ↓ reculer
+- ← tourner gauche
+- → tourner droite
+- espace → stop
 
 ---
 
-##  Améliorations possibles
+## Lancer le projet
 
-- stratégie greedy (valeur / distance / temps)
-- pathfinding (A*)
-- cartes d’occupation
-- obstacles dynamiques
-- multi-robots
+### Installer les dépendances
+
+```bash
+pip install pygame
+````
 
 ---
 
-##  Lancement
+### Lancer le jeu (mode graphique)
 
 ```bash
 python main_pygame.py
+```
+
+---
+
+### Lancer en mode terminal
+
+```bash
+python main_terminal.py
+```
+
+---
+
+## Interface
+
+Affiche :
+
+* score
+* temps restant
+* vague
+* mode
+* valeur des trésors
+* maison (rouge → vert)
+* bouton pause
+* bouton fin de partie
+
+---
+
+## Fonctionnalités principales
+
+* robot mobile 2D
+* LiDAR
+* navigation autonome
+* mode joueur
+* système de vagues
+* difficulté progressive
+* bruit moteur réaliste
+* interface complète
+* export CSV
+
+---
+
+## Améliorations possibles
+
+* A* (pathfinding)
+* carte d’occupation
+* stratégie plus avancée
+* multi-robots
+* obstacles dynamiques
+
+---
+
+## Conclusion
+
+Le projet met en œuvre :
+
+* capteurs
+* navigation
+* simulation
+* IA simple
+
+La principale difficulté a été de passer d’une navigation réactive à une navigation plus robuste et autonome.
